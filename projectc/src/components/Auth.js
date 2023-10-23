@@ -1,98 +1,128 @@
-import PhoneInput from 'react-phone-input-2'
-import 'react-phone-input-2/lib/style.css'
-import { getAuth, RecaptchaVerifier,signInWithPhoneNumber} from "firebase/auth";
-import {auth,db} from '..firebase'
+import {Form,Field, ErrorMessage} from 'formik'
+import { Formik } from 'formik';
 import { useState } from 'react';
-import OtpInput from "otp-input-react";
-import { addDoc, collection, doc, getDoc, getDocs,getFirestore, setDoc } from 'firebase/firestore'
-import { useNavigate } from 'react-router';
-function Otp()
+import * as Yup from 'yup'
+import {  createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
+import {auth, db} from '../firebase'
+import { doc, setDoc } from 'firebase/firestore';
+
+function Auth()
 {
-    const [phoneno,sphoneno]=useState();
-    const navigate=useNavigate();
-    const [otp,setOtp]=useState();
-    const collect=collection(db,'users')
-    
-    function setrecaptcha() {
-        window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {});
-        window.recaptchaVerifier.render()
+    const [err,serr]=useState('')
+    const pstyle={
+        color:'blue',
+        textDecoration:'underline',
+        cursor:'pointer'
     }
-    const verify=async()=>{
-        const code = otp
-        const confirmationResult=window.confirmationResult
-        confirmationResult.confirm(code).then( async(result) => {
+    const [login,slogin]=useState(true)
+    const validationSchema=Yup.object({
+        name:Yup.string(),
+        email:Yup.string().email("Invalid email format").required("Required"),
+        password:Yup.string().required("Required")
+    })
+    const validationSchemas=Yup.object({
+        name:Yup.string().required('Required'),
+        email:Yup.string().email("Invalid email format").required("Required"),
+        password:Yup.string().required("Required")
+    })
+    const initialValues={
+        name:'',
+        email:'',
+        password:'' ,
+       
+       };
+    const submit= async (values,props)=>{
+        console.log(values)
+        if (!login){
             
-        console.log('success')
-        const user = result.user;
-        console.log(user.uid)
-        const docRef = doc(db, "users", user.uid )
-        const help=await getDoc(docRef)
-        console.log(help.get('userid'))
-        console.log(help.data)
-        if (!help.get('userid')) {
-            console.log('hello')
-            navigate('user',{
-                state:{
-                    'userid':user.uid,
-                    'phno':user.phoneNumber
-                }
+            createUserWithEmailAndPassword(auth, values.email, values.password)
+            .then(async(userCredential) => {
+                // Signed up 
+                const user = userCredential.user;
+                console.log(user);
+                const docRef = doc(db, "users", user.uid )
+                const hello= await setDoc(docRef,{
+                    uuid:user.uid,
+                    name:values.name,
+                    email:values.email,
+                    
+                })
+                console.log('succes')
+
             })
-            const hello= await setDoc(docRef,{
-                uuid:user.uid,
-                phno:user.phoneNumber
+            .catch((error) => {
+                const errorCode = error.code;
+                const errorMessage = error.message;
+               
+                serr(errorCode)
+                // ..
+            });
+        }
+        else
+        {
+            signInWithEmailAndPassword(auth,values.email,values.password).then((val)=>{
+                console.log('login success')
+            }).catch((err)=>{
+                console.log(err)
+                serr(err.code)
             })
         }
-        console.log(help)
-       
-        }).catch((error) => {
-        // User couldn't sign in (bad verification code?)
-        // ...
-        console.log(error)
-        });
-
     }
-    const clicker= async (e)=>{
-       const res=await setrecaptcha()
-       const phoneNumber = "+"+phoneno;
-       const appVerifier = window.recaptchaVerifier;
-       signInWithPhoneNumber(auth, phoneNumber, appVerifier)
-        .then((confirmationResult) => {
-        console.log('heeeee')
-        window.confirmationResult = confirmationResult;
-        console.log(confirmationResult)
-        
-      // ...
-     }).catch((error) => {
-      // Error; SMS not sent
-      // ...
-        console.log(error)
-        });
-
+    const divstyle={
+        color:'red'
     }
-    return(
+    return (
         <div>
-            <PhoneInput
-                country={'in'}
-                value={phoneno}
-                onChange={sphoneno}
-            />
-            <OtpInput
-                  value={otp}
-                  onChange={setOtp}
-                  OTPLength={6}
-                  otpType="number"
-                  disabled={false}
-                  autoFocus
-                  
-                ></OtpInput>
-                <br/>
-                <button onClick={verify}>Verify</button>
-                <br/>
-            <br/>
-            <div id='recaptcha-container'></div>
-            <button className='bg-blue-400 p-2' onClick={(e)=>clicker(e)}>Send otp</button>
+            <Formik
+            validateOnChange
+            validationSchema={login?validationSchema:validationSchemas}
+            initialValues={initialValues}
+            onSubmit={submit}
+            >
+               {
+                    (formik)=>{
+                        return(
+                            
+                            <Form>
+                          {
+                            !login?<div>
+                                <label htmlFor="name">Name:</label>
+                                <Field type="text" name="name"  id="name" /><br/>
+                                <ErrorMessage name='name'/>
+                            </div>:''
+                          }
+                            <br/>
+                            <label htmlFor="email">Email:</label>
+                            <Field type="email" name="email" id="email"  /><br/>
+                            <ErrorMessage name='email'/><br/>
+                            <label htmlFor="password">Password:</label>
+                            <Field type="password" name="password" id="password"  /><br/>
+                            <ErrorMessage name='password'/><br/>
+                            {!login?<p style={pstyle} onClick={()=>{
+                                slogin((v)=>!v )
+                                serr('')
+                            }}>Already a user?</p>:<p style={pstyle} onClick={()=>{
+                                slogin((v)=>!v)
+                                serr('')
+                                console.log(login)
+                            }}>Create an account</p>
+                            
+                            
+                            }
+                            {
+                                login?<p style={pstyle} onClick={()=>{
+                                   
+                                }}>Forgot password</p>:''
+                            }
+                            {err}
+                            <input type="submit" value={!login?'Sign up':'Login'}></input>
+                            <br/>
+                        </Form>
+                        )
+                    }
+               }
+            </Formik>
         </div>
     )
 }
-
-export default Otp
+export default Auth
