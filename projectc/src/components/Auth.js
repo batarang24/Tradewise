@@ -5,7 +5,7 @@ import * as Yup from 'yup'
 import {  createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
 import {auth, db} from '../firebase'
 import { doc, setDoc } from 'firebase/firestore';
-
+import { getAuth, sendSignInLinkToEmail } from "firebase/auth";
 function Auth()
 {
     const [err,serr]=useState('')
@@ -57,6 +57,8 @@ function Auth()
                 serr(errorCode)
                 // ..
             });
+            
+
         }
         else
         {
